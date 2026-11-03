@@ -1,12 +1,17 @@
 # paper-actors
 
-A Paper plugin that adds fake players and lets you control them remotely through a signed HTTP API.
+Fake players on a Paper or a Minestom test server, controlled remotely through a signed HTTP API.
 
 The actors are server-side players. They have no client and no network connection, so a server can keep hundreds of them.
 Every action goes through the server's own packet handlers. Thus other plugins see the same events that a real player
 causes: block break and place, interact, inventory click, chat command, sign change.
 
-Use it on a **test or filming server only**. The plugin switches itself off on a server that is not in its
+- **Paper:** a plugin (`paper-actors-<version>.jar`).
+- **Minestom:** a library that the test server calls (`minestom-actors-<version>.jar`). See [Minestom](#minestom).
+
+Both have the same API, so the same clients drive them.
+
+Use it on a **test or filming server only**. The actors switch themselves off on a server that is not in the
 `allowed-servers` list.
 
 ## Uses
@@ -17,12 +22,12 @@ Use it on a **test or filming server only**. The plugin switches itself off on a
 
 ## Requirements
 
-- Paper 26.2 (the plugin uses server internals; other versions are not tested)
+- Paper 26.2 (the plugin uses server internals; other versions are not tested), or Minestom `2026.10.07-26.2`
 - Java 25
 
 ## Download
 
-Get `paper-actors-<version>.jar` and `actors_client.py` from the
+Get `paper-actors-<version>.jar` (Paper), `minestom-actors-<version>.jar` (Minestom) and `actors_client.py` from the
 [releases](https://github.com/MrMirhan/paper-actors/releases). `SHA256SUMS.txt` has the checksums.
 
 ## Build
@@ -31,7 +36,8 @@ Get `paper-actors-<version>.jar` and `actors_client.py` from the
 ./gradlew build
 ```
 
-The jar is in `build/libs/paper-actors-<version>.jar`. Do not use the `-dev` jar.
+The Paper jar is in `build/libs/paper-actors-<version>.jar` (do not use the `-dev` jar), and the Minestom jar is in
+`minestom/build/libs/minestom-actors-<version>.jar`.
 
 ## Setup
 
@@ -47,6 +53,71 @@ without a firewall.
 
 See [`src/main/resources/config.yml`](src/main/resources/config.yml) for all settings: actor limit (up to 1000), spawns per
 tick, view distance, game mode, UUID namespace, reserved names and scene commands.
+
+## Minestom
+
+Minestom has no plugins, so `minestom-actors` is a library. The test server starts it in its `main`, after
+`MinecraftServer.init()`:
+
+```java
+MinestomActors actors = MinestomActors.start(ActorSettings.of(world, new Pos(0, 41, 0))
+        .allowedServers(List.of("shipyard-test"))   // this build may run actors only on these servers
+        .limits(200, 4)                             // at most 200 actors; a crowd joins 4 a tick
+        .viewDistance(4));
+server.start("0.0.0.0", 25565);
+```
+
+- **The server's name.** Minestom has no `server.properties`. The name comes from `ACTORS_SERVER_NAME` in the environment
+  (or `serverName(...)`), and `allowedServers` must list it. Keep the list in the test server's code, and set the name on the
+  test machine only. The same build started anywhere else then refuses to run actors.
+- **The secret.** It comes from `PAPER_ACTORS_SECRET` (or `secret(...)`), with the same rules as on Paper.
+- **The dependency.** Add the jar to the test server's build, for example
+  `implementation(files("libs/minestom-actors-0.2.0.jar"))`. The jar does not contain Minestom: the server supplies it.
+- **Your own data.** `actors.isActor(player)` says whether a player is an actor, so a game that saves its players' data can
+  leave actors out.
+- **Try it.** `./gradlew :minestom:runTestServer` starts a small flat test server with the actors on 127.0.0.1:4331.
+
+How an actor works on Minestom:
+
+- **It joins as a player does.** It goes through the server's own configuration and join steps, so the game's
+  `AsyncPlayerConfigurationEvent` and spawn listeners see it. Minestom's own test players join the same way. It skips the
+  known-packs exchange, so the server sends it no registry data.
+- **It answers like a client.** It answers keep-alives, so the server does not kick it. It acknowledges chunk batches, so the
+  world around it keeps loading.
+- **It moves itself.** Minestom does not move players: a client says where it is. So the actor walks with Minestom's own
+  collision code (gravity, step-up by a jump, walls) and sends its position as a client does: `PlayerMoveEvent`.
+- **Its actions are a client's packets.** They go into the player's packet queue, and the server handles them with its own
+  listeners. The game sees `PlayerBlockInteractEvent`, `PlayerBlockPlaceEvent`, `PlayerBlockBreakEvent` (after the
+  server's own break time), `InventoryPreClickEvent`, `PlayerEntityInteractEvent`, `EntityAttackEvent`, `PlayerChatEvent`
+  and commands.
+- **Minestom applies no damage.** An attack fires `EntityAttackEvent` (a `hit` in the event log), and the game's combat
+  code decides the damage.
+- **Scene commands** run with the server's console sender; Minestom has only the commands the game registers. A scene's
+  `tickRate` is refused, because Minestom has no tick rate command.
+- **What a crowd measures.** A crowd measures what the game costs per player in a tick: movement, chunks, entities and
+  events. Packet writing, compression and the network are not measured, because actors have no socket.
+
+Where it differs from Paper:
+
+- **Joining.** An actor takes a tick or two to join. Until it is in, `state` gives its name, UUID and `task: "joining"`
+  only, and `act` and `actor` answer 409.
+- **Screens.** `trade` and `rename` answer 409 when their screen (trading, anvil) is not open. Minestom has no trading of its
+  own: a trade reaches the game only if the game handles `ClientSelectTradePacket`.
+- **Fighting.** `fight` with `style: "1.9"` waits out a 625 ms cooldown between swings, but Minestom keeps no attack strength
+  to check.
+- **Names and skins.** Minestom keeps no player data, so it does not refuse names that real players used. It refuses
+  reserved names and real players who are online. A skin is `{value, signature}`, or a name from the `skins(folder)` setting.
+
+Checked against Minestom 2026.10.07-26.2 through the minecraft MCP server's `actors` tools, with the test server's own
+listeners reporting each event:
+
+- A crowd of 50 (view 3) joined. On a flat world the average tick went from 0.36 ms to 0.68 ms, with 144 chunks loaded.
+- Movement: `goto` around a wall, `teleport`, `walk`, `stroll`, `jump` and `sneak`.
+- Screens: a chest menu opened with `use_on`, and a left click put its item on the cursor. A left `drag` split 61 planks over
+  three slots. `trade` and a screen `button` reached the game's handlers. `rename` worked on an anvil.
+- Hands: `equip`, `select`, `place`, `break` after the break time, `use`, `swap_hands` and `drop`.
+- The rest: `interact` with a villager, `sign`, `chat`, a command, `attack` and `fight` (26 hits in 4 s), and a scene with
+  `walk` and `chat`.
 
 ## API
 
@@ -86,7 +157,7 @@ the method, the path with its query, the time, the nonce, and `hex(SHA-256(body)
 | `interact` | `target` | right-clicks a player, or the nearest entity of a type (`villager`) |
 | `click` | `slot`, `type`, `hotbar` | `left`, `right`, `shift`, `shift_right`, `number`, `offhand`, `middle`, `drop`, `drop_stack`, `double`, `pickup_all`, `outside_left`, `outside_right` |
 | `drag`, `close`, `button` | `slots`, `button` / - / `id` | drags the cursor stack; closes the screen; enchanting, stonecutter, loom and lectern buttons |
-| `rename`, `trade`, `sign` | `name` / `index` / `x`, `y`, `z`, `lines`, `front` | anvil name, villager offer, sign text |
+| `rename`, `trade`, `sign` | `text` / `index` / `x`, `y`, `z`, `lines`, `front` | anvil name (`text`, since `name` is the actor's), villager offer, sign text |
 | `command`, `chat` | `command` / `text` (256 characters or fewer) | as the actor, with its own permissions |
 | `idle`, `stop` | `seconds` | wait; cancel the current task |
 
@@ -118,7 +189,7 @@ Profiles (`rookie`, `mid`, `tryhard`) set turn speed, clicks per second and aim.
 ## Tests
 
 ```bash
-./gradlew test
+./gradlew test        # the core, the Paper plugin, and the Minestom actors on a real Minestom server in the test JVM
 python3 -m unittest discover -s client
 ```
 

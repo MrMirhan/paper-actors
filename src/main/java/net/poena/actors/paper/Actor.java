@@ -261,7 +261,8 @@ final class Actor {
             case "drag" -> hands.drag(ints(req, "slots"), opt(req, "button", "left"));
             case "close" -> hands.close();
             case "button" -> hands.button((int) num(req, "id"));
-            case "rename" -> hands.rename(str(req, "name"));
+            // The anvil name is `text`: the clients put the actor's own name in `name`.
+            case "rename" -> hands.rename(str(req, "text"));
             case "trade" -> hands.trade((int) num(req, "index"));
             case "sign" -> {
                 BlockPos pos = blockAt(req);

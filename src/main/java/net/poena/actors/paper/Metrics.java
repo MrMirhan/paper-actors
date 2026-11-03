@@ -2,31 +2,13 @@ package net.poena.actors.paper;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import java.util.Arrays;
+import net.poena.actors.core.TickStats;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 
 /** How the server holds up, from Paper's own counters: TPS, tick times (average, p95, max), and what keeps it busy. */
 final class Metrics {
     private Metrics() {
-    }
-
-    private static double ms(double nanos) {
-        return Math.round(nanos / 10_000.0) / 100.0;
-    }
-
-    /** The tick times of the last 100 ticks, in milliseconds: average, p95 and max. */
-    static JsonObject tickTimes(long[] nanos) {
-        long[] sorted = Arrays.stream(nanos).filter(n -> n > 0).sorted().toArray();
-        JsonObject o = new JsonObject();
-        if (sorted.length == 0) {
-            return o;
-        }
-        o.addProperty("avg", ms(Arrays.stream(sorted).average().orElse(0)));
-        o.addProperty("p95", ms(sorted[Math.min(sorted.length - 1, (int) Math.ceil(sorted.length * 0.95) - 1)]));
-        o.addProperty("max", ms(sorted[sorted.length - 1]));
-        o.addProperty("samples", sorted.length);
-        return o;
     }
 
     static JsonObject sample() {
@@ -37,7 +19,7 @@ final class Metrics {
             t.add(Math.round(Math.min(20, v) * 100) / 100.0);
         }
         o.add("tps", t);
-        o.add("mspt", tickTimes(Bukkit.getServer().getTickTimes()));
+        o.add("mspt", TickStats.summary(Bukkit.getServer().getTickTimes()));
         int chunks = 0;
         int entities = 0;
         JsonArray worlds = new JsonArray();

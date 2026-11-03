@@ -9,7 +9,6 @@ import com.mojang.authlib.properties.Property;
 import com.mojang.authlib.properties.PropertyMap;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +38,7 @@ import net.poena.actors.core.EventLog;
 import net.poena.actors.core.Gate;
 import net.poena.actors.core.Rng;
 import net.poena.actors.core.SceneRunner;
+import net.poena.actors.core.SkinLibrary;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -358,8 +358,7 @@ final class ActorManager implements Control {
     }
 
     UUID uuidFor(String name) {
-        // Not the offline UUID of the same name, so an actor can never share data, permissions or ops with a real account.
-        return UUID.nameUUIDFromBytes((cfg.uuidNamespace() + ":" + name.toLowerCase(Locale.ROOT)).getBytes(StandardCharsets.UTF_8));
+        return Gate.actorUuid(cfg.uuidNamespace(), name);
     }
 
     private Actor spawnNow(JsonObject req) {

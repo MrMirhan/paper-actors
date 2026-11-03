@@ -1,0 +1,67 @@
+// minestom-actors: the same fake players and signed API as the Paper plugin, for a Minestom test server. Minestom has no
+// plugins, so this is a library: the test server's main calls MinestomActors.start. The core (net.poena.actors.core) is the
+// Paper plugin's own source, built into this jar too.
+plugins {
+    id 'java-library'
+}
+
+group = 'net.poena'
+version = rootProject.version
+base.archivesName = 'minestom-actors'
+
+def minestomVersion = '2026.10.07-26.2'
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir "${rootProject.projectDir}/src/main/java"
+            include 'net/poena/actors/core/**', 'net/poena/actors/minestom/**'
+        }
+    }
+}
+
+dependencies {
+    // The test server brings Minestom (and its gson); this jar does not carry it.
+    compileOnly "net.minestom:minestom:${minestomVersion}"
+    compileOnly 'org.slf4j:slf4j-api:2.0.20'
+    testImplementation "net.minestom:minestom:${minestomVersion}"
+    testImplementation "net.minestom:testing:${minestomVersion}"
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'org.slf4j:slf4j-simple:2.0.17'
+}
+
+java {
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+tasks.test {
+    useJUnitPlatform()
+    testLogging { events 'passed', 'failed', 'skipped'; exceptionFormat = 'full' }
+}
+
+// A small Minestom test server with the actors on a flat world, to try the API by hand or from an MCP client:
+//   PAPER_ACTORS_SECRET=... ./gradlew :minestom:runTestServer
+tasks.register('runTestServer', JavaExec) {
+    group = 'application'
+    description = 'Starts a flat Minestom test server with the actors (port 25565, API on 127.0.0.1:4331).'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.poena.actors.minestom.TestServer'
+    standardInput = System.in
+}
+
+jar {
+    manifest {
+        attributes('Implementation-Title': 'minestom-actors', 'Implementation-Version': project.version)
+    }
+}
