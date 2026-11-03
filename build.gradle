@@ -1,0 +1,37 @@
+// Test-only Paper plugin: scripted fake players for filming. Compiled against server internals (paperweight).
+plugins {
+    id 'java'
+    id 'io.papermc.paperweight.userdev' version '2.0.0-beta.24'
+}
+
+group = 'net.poena'
+version = '0.1.0'
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+// Paper 26.x runs on Mojang mappings, so the plain jar ships as is; there is no reobf step.
+paperweight.reobfArtifactConfiguration = io.papermc.paperweight.userdev.ReobfArtifactConfiguration.Companion.MOJANG_PRODUCTION
+
+dependencies {
+    paperweight.paperDevBundle('26.2.build.133-stable')
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+tasks.test {
+    useJUnitPlatform()
+    testLogging { events 'passed', 'failed', 'skipped'; exceptionFormat = 'full' }
+}
+
+processResources {
+    filesMatching('plugin.yml') { expand(version: version) }
+}

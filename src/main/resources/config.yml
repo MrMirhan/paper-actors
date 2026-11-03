@@ -1,0 +1,41 @@
+# PaperActors adds fake players that you control over a signed local HTTP API. TEST AND FILMING SERVERS ONLY.
+#
+# The plugin switches itself off unless this server is listed here. An entry is the server-name from server.properties
+# (set it to something unique first, for example "film-test"), or "server-name:port". An empty list refuses everything.
+allowed-servers: []
+
+# Signs every API request (HMAC-SHA256). At least 16 characters (32 when api.host is not loopback). Empty: the
+# PAPER_ACTORS_SECRET environment variable is used.
+secret: ""
+
+api:
+  # 127.0.0.1 (default): this machine only; reach it from elsewhere through an SSH tunnel. Another address (0.0.0.0, a LAN or
+  # container address) lets a remote tool drive the actors directly; every request is still signed, and the secret must then be
+  # at least 32 characters. Never put it on a public address without a firewall.
+  host: 127.0.0.1
+  port: 4331
+
+# How many actors may be spawned at once (up to 1000). A crowd call queues them and joins spawns-per-tick each tick.
+max-actors: 8
+spawns-per-tick: 2
+# The view distance each actor keeps loaded (2-32). Most of a bot's cost is the world around it: keep it small for crowds.
+view-distance: 4
+gamemode: survival
+
+# Actor UUIDs are made from this and the name, so an actor never shares the data of the real account with that name.
+uuid-namespace: PaperActor
+
+# No join or quit message for actors.
+quiet: true
+
+# Names an actor can never take (your staff, your camera account). A trailing * matches a prefix.
+reserved: []
+
+# Refuse a name that belongs to a real account that has played on this server, unless it is listed in allow-played.
+refuse-played-names: true
+allow-played: []
+
+# A scene's setup and cleanup lists are console commands. Off by default; only the first word is checked against allowed.
+scene-commands:
+  enabled: false
+  allowed: [time, weather, gamerule, tick, tp, teleport, gamemode, give, effect, clear, difficulty, setblock, fill, summon]

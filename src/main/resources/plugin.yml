@@ -1,0 +1,5 @@
+name: PaperActors
+version: ${version}
+main: net.poena.actors.paper.ActorsPlugin
+api-version: '26.2'
+description: Scripted fake players for filming. Test and filming servers only.
