@@ -26,6 +26,8 @@ import net.minestom.server.instance.Instance;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.block.BlockFace;
 import net.minestom.server.inventory.AbstractInventory;
+import net.minestom.server.inventory.Inventory;
+import net.minestom.server.inventory.InventoryType;
 import net.minestom.server.item.ItemStack;
 import net.minestom.server.item.Material;
 import net.minestom.server.network.packet.client.ClientPacket;
@@ -429,13 +431,19 @@ final class Actor {
                 send(new ClientClickWindowButtonPacket(windowId(), (int) num(req, "id")));
             }
             case "rename" -> {
-                String n = str(req, "name");
+                screen(InventoryType.ANVIL, "anvil");
+                // The anvil name is `text`: the clients put the actor's own name in `name`.
+                String n = str(req, "text");
                 if (n.length() > 50) {
                     throw new ApiException(400, "an anvil name is at most 50 characters");
                 }
                 send(new ClientNameItemPacket(n));
             }
-            case "trade" -> send(new ClientSelectTradePacket((int) num(req, "index")));
+            case "trade" -> {
+                // Minestom has no trading of its own: the packet reaches the game's own listener for it, if it has one.
+                screen(InventoryType.MERCHANT, "trading");
+                send(new ClientSelectTradePacket((int) num(req, "index")));
+            }
             case "sign" -> {
                 List<String> lines = new ArrayList<>(strings(req, "lines"));
                 while (lines.size() < 4) {
@@ -444,6 +452,13 @@ final class Actor {
                 send(new ClientUpdateSignPacket(blockAt(req), !req.has("front") || bool(req, "front"), lines));
             }
             default -> throw new ApiException(400, "unknown action '" + action + "'");
+        }
+    }
+
+    /** The open screen is of this type, or the action has nothing to act on. */
+    private void screen(InventoryType type, String what) {
+        if (!(player.getOpenInventory() instanceof Inventory open) || open.getInventoryType() != type) {
+            throw new ApiException(409, "no " + what + " screen is open");
         }
     }
 

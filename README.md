@@ -97,6 +97,28 @@ How an actor works on Minestom:
 - **What a crowd measures.** A crowd measures what the game costs per player in a tick: movement, chunks, entities and
   events. Packet writing, compression and the network are not measured, because actors have no socket.
 
+Where it differs from Paper:
+
+- **Joining.** An actor takes a tick or two to join. Until it is in, `state` gives its name, UUID and `task: "joining"`
+  only, and `act` and `actor` answer 409.
+- **Screens.** `trade` and `rename` answer 409 when their screen (trading, anvil) is not open. Minestom has no trading of its
+  own: a trade reaches the game only if the game handles `ClientSelectTradePacket`.
+- **Fighting.** `fight` with `style: "1.9"` waits out a 625 ms cooldown between swings, but Minestom keeps no attack strength
+  to check.
+- **Names and skins.** Minestom keeps no player data, so it does not refuse names that real players used. It refuses
+  reserved names and real players who are online. A skin is `{value, signature}`, or a name from the `skins(folder)` setting.
+
+Checked against Minestom 2026.10.07-26.2 through the minecraft MCP server's `actors` tools, with the test server's own
+listeners reporting each event:
+
+- A crowd of 50 (view 3) joined. On a flat world the average tick went from 0.36 ms to 0.68 ms, with 144 chunks loaded.
+- Movement: `goto` around a wall, `teleport`, `walk`, `stroll`, `jump` and `sneak`.
+- Screens: a chest menu opened with `use_on`, and a left click put its item on the cursor. A left `drag` split 61 planks over
+  three slots. `trade` and a screen `button` reached the game's handlers. `rename` worked on an anvil.
+- Hands: `equip`, `select`, `place`, `break` after the break time, `use`, `swap_hands` and `drop`.
+- The rest: `interact` with a villager, `sign`, `chat`, a command, `attack` and `fight` (26 hits in 4 s), and a scene with
+  `walk` and `chat`.
+
 ## API
 
 Every request has three headers:
@@ -135,7 +157,7 @@ the method, the path with its query, the time, the nonce, and `hex(SHA-256(body)
 | `interact` | `target` | right-clicks a player, or the nearest entity of a type (`villager`) |
 | `click` | `slot`, `type`, `hotbar` | `left`, `right`, `shift`, `shift_right`, `number`, `offhand`, `middle`, `drop`, `drop_stack`, `double`, `pickup_all`, `outside_left`, `outside_right` |
 | `drag`, `close`, `button` | `slots`, `button` / - / `id` | drags the cursor stack; closes the screen; enchanting, stonecutter, loom and lectern buttons |
-| `rename`, `trade`, `sign` | `name` / `index` / `x`, `y`, `z`, `lines`, `front` | anvil name, villager offer, sign text |
+| `rename`, `trade`, `sign` | `text` / `index` / `x`, `y`, `z`, `lines`, `front` | anvil name (`text`, since `name` is the actor's), villager offer, sign text |
 | `command`, `chat` | `command` / `text` (256 characters or fewer) | as the actor, with its own permissions |
 | `idle`, `stop` | `seconds` | wait; cancel the current task |
 

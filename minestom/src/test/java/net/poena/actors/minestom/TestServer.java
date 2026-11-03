@@ -52,7 +52,12 @@ public final class TestServer {
         events.addListener(PlayerBlockBreakEvent.class, e -> System.out.println("[game] " + e.getPlayer().getUsername() + " broke " + e.getBlock().name()));
         events.addListener(PlayerChatEvent.class, e -> System.out.println("[game] chat " + e.getPlayer().getUsername() + ": " + e.getRawMessage()));
         events.addListener(PlayerBlockInteractEvent.class, e -> {
+            if (e.getBlock().compare(Block.ANVIL)) {
+                e.setBlockingItemUse(true);
+                e.getPlayer().openInventory(new Inventory(InventoryType.ANVIL, Component.text("Repair")));
+            }
             if (e.getBlock().compare(Block.CHEST)) {
+                e.setBlockingItemUse(true);
                 Inventory menu = new Inventory(InventoryType.CHEST_1_ROW, Component.text("Shop"));
                 menu.setItemStack(4, ItemStack.of(Material.DIAMOND).with(net.minestom.server.component.DataComponents.CUSTOM_NAME, Component.text("Buy")));
                 e.getPlayer().openInventory(menu);
@@ -60,6 +65,35 @@ public final class TestServer {
             }
         });
         events.addListener(InventoryPreClickEvent.class, e -> System.out.println("[game] " + e.getPlayer().getUsername() + " clicked " + e.getClick()));
+        events.addListener(net.minestom.server.event.player.PlayerBlockPlaceEvent.class,
+                e -> System.out.println("[game] " + e.getPlayer().getUsername() + " placed " + e.getBlock().name() + " at " + e.getBlockPosition()));
+        events.addListener(net.minestom.server.event.player.PlayerChangeHeldSlotEvent.class,
+                e -> System.out.println("[game] " + e.getPlayer().getUsername() + " held slot " + e.getNewSlot()));
+        events.addListener(net.minestom.server.event.player.PlayerSwapItemEvent.class, e -> System.out.println("[game] " + e.getPlayer().getUsername() + " swapped hands"));
+        events.addListener(net.minestom.server.event.item.ItemDropEvent.class, e -> System.out.println("[game] " + e.getPlayer().getUsername() + " dropped " + e.getItemStack().material().name()));
+        events.addListener(net.minestom.server.event.player.PlayerUseItemEvent.class, e -> System.out.println("[game] " + e.getPlayer().getUsername() + " used " + e.getItemStack().material().name()));
+        events.addListener(net.minestom.server.event.player.PlayerEditSignEvent.class, e -> System.out.println("[game] " + e.getPlayer().getUsername() + " wrote a sign: " + e.getLines()));
+        events.addListener(net.minestom.server.event.player.PlayerAnvilInputEvent.class, e -> System.out.println("[game] " + e.getPlayer().getUsername() + " named " + e.getInput()));
+        events.addListener(net.minestom.server.event.inventory.InventoryButtonClickEvent.class, e -> System.out.println("[game] " + e.getPlayer().getUsername() + " pressed button " + e.getButtonId()));
+        events.addListener(net.minestom.server.event.player.PlayerInputEvent.class, e -> {
+            if (e.getPlayer().isSneaking()) {
+                System.out.println("[game] " + e.getPlayer().getUsername() + " sneaks");
+            }
+        });
+        // A villager: a right click opens its trades; the game handles the trade packet itself (Minestom has no trading).
+        var villager = new net.minestom.server.entity.EntityCreature(net.minestom.server.entity.EntityType.VILLAGER);
+        villager.setInstance(world, new Pos(-4, 40, 0));
+        events.addListener(net.minestom.server.event.player.PlayerEntityInteractEvent.class, e -> {
+            System.out.println("[game] " + e.getPlayer().getUsername() + " interacted with " + e.getTarget().getEntityType().name());
+            if (e.getTarget() == villager) {
+                e.getPlayer().openInventory(new Inventory(InventoryType.MERCHANT, Component.text("Trades")));
+            }
+        });
+        MinecraftServer.getPacketListenerManager().setPlayListener(net.minestom.server.network.packet.client.play.ClientSelectTradePacket.class,
+                (packet, player) -> System.out.println("[game] " + player.getUsername() + " picked trade " + packet.selectedSlot()));
+        // An anvil opens the anvil screen; a sign is there to write on.
+        world.setBlock(-2, 40, 2, Block.ANVIL);
+        world.setBlock(-2, 40, -2, Block.OAK_SIGN);
         Command where = new Command("where");
         where.setDefaultExecutor((sender, context) -> {
             if (sender instanceof Player p) {
