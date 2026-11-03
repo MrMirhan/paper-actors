@@ -74,6 +74,14 @@ public final class Gate {
         return host == null || host.isBlank() || host.equals("localhost") || host.equals("::1") || host.startsWith("127.");
     }
 
+    /**
+     * An actor's UUID: from the namespace and the name, not the offline UUID of the name, so an actor can never share data,
+     * permissions or ops with a real account of that name. The same on every server, so a test can count on it.
+     */
+    public static java.util.UUID actorUuid(String namespace, String name) {
+        return java.util.UUID.nameUUIDFromBytes((namespace + ":" + name.toLowerCase(Locale.ROOT)).getBytes(StandardCharsets.UTF_8));
+    }
+
     public static boolean validName(String name) {
         return name != null && NAME.matcher(name).matches();
     }

@@ -44,7 +44,7 @@ jobs:
         if: steps.version.outputs.new == 'true'
         run: |
           mkdir dist
-          cp build/libs/paper-actors-*.jar dist/
+          cp build/libs/paper-actors-*.jar minestom/build/libs/minestom-actors-*.jar dist/
           rm -f dist/*-dev.jar dist/*-sources.jar
           cp client/actors_client.py dist/
           (cd dist && sha256sum * > SHA256SUMS.txt)

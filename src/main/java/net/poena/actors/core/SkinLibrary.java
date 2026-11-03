@@ -1,4 +1,4 @@
-package net.poena.actors.paper;
+package net.poena.actors.core;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -8,16 +8,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
-import net.poena.actors.core.ApiException;
 
 /** Signed skin textures kept as {@code skins/<name>.json} ({"value": ..., "signature": ...}). The plugin never calls a skin service itself. */
-final class SkinLibrary {
+public final class SkinLibrary {
     private static final Pattern NAME = Pattern.compile("[A-Za-z0-9_.-]{1,64}");
 
     private SkinLibrary() {
     }
 
-    static JsonObject load(Path dir, String name) {
+    public static JsonObject load(Path dir, String name) {
         if (!NAME.matcher(name).matches() || name.contains("..")) {
             throw new ApiException(400, "skin name may only use letters, digits, . _ -");
         }

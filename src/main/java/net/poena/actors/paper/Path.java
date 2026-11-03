@@ -1,30 +1,19 @@
 package net.poena.actors.paper;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
+import net.poena.actors.core.Pathfinder;
 
 /**
- * A walking path over the blocks the server has loaded: A* on whole blocks, steps up one block (a jump), drops down up to three,
- * and through open doors and plants. Never through lava, fire or cactus; never into an unloaded chunk. Bounded, so a far or
- * closed target answers "no path" instead of stalling the tick.
+ * A walking path over the blocks the server has loaded (core.Pathfinder): what each block is, as Paper says it. Never through
+ * lava, fire or cactus; never into an unloaded chunk.
  */
 final class Path {
-    static final int MAX_NODES = 6000;
-    static final int MAX_DROP = 3;
-
     private Path() {
-    }
-
-    private record Node(BlockPos pos, double g, double f, Node parent) {
     }
 
     private static boolean loaded(Level level, BlockPos p) {
@@ -50,72 +39,29 @@ final class Path {
         return (s.blocksMotion() || !s.getFluidState().isEmpty()) && !dangerous(s);
     }
 
-    static boolean standable(Level level, BlockPos feet) {
-        return loaded(level, feet) && passable(level, feet) && passable(level, feet.above()) && ground(level, feet.below());
-    }
-
     /** The feet positions from `start` to `goal` (both block positions), or an empty list when there is none within the bound. */
     static List<BlockPos> find(Level level, BlockPos start, BlockPos goal, double within) {
-        PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Double.compare(a.f, b.f));
-        Map<BlockPos, Double> best = new HashMap<>();
-        open.add(new Node(start, 0, start.distManhattan(goal), null));
-        best.put(start, 0.0);
-        int seen = 0;
-        while (!open.isEmpty() && seen++ < MAX_NODES) {
-            Node n = open.poll();
-            if (Math.sqrt(n.pos.distSqr(goal)) <= within) {
-                return unwind(n);
+        Pathfinder.Blocks blocks = new Pathfinder.Blocks() {
+            public boolean loaded(int x, int y, int z) {
+                return Path.loaded(level, new BlockPos(x, y, z));
             }
-            for (int[] d : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}) {
-                BlockPos side = n.pos.offset(d[0], 0, d[1]);
-                boolean diagonal = d[0] != 0 && d[1] != 0;
-                if (diagonal && (!passable(level, n.pos.offset(d[0], 0, 0)) || !passable(level, n.pos.offset(0, 0, d[1]))
-                        || !passable(level, n.pos.offset(d[0], 1, 0)) || !passable(level, n.pos.offset(0, 1, d[1])))) {
-                    continue;
-                }
-                BlockPos to = null;
-                double cost = diagonal ? 1.414 : 1;
-                if (standable(level, side)) {
-                    to = side;
-                } else if (!diagonal && standable(level, side.above()) && passable(level, n.pos.above(2))) {
-                    to = side.above();
-                    cost += 0.6;
-                } else if (!diagonal && passable(level, side) && passable(level, side.above())) {
-                    for (int drop = 1; drop <= MAX_DROP; drop++) {
-                        BlockPos down = side.below(drop);
-                        if (!loaded(level, down)) {
-                            break;
-                        }
-                        if (standable(level, down)) {
-                            to = down;
-                            cost += 0.3 * drop;
-                            break;
-                        }
-                        if (!passable(level, down)) {
-                            break;
-                        }
-                    }
-                }
-                if (to == null) {
-                    continue;
-                }
-                double g = n.g + cost;
-                Double known = best.get(to);
-                if (known != null && known <= g) {
-                    continue;
-                }
-                best.put(to, g);
-                open.add(new Node(to, g, g + Math.sqrt(to.distSqr(goal)), n));
+
+            public boolean passable(int x, int y, int z) {
+                return Path.passable(level, new BlockPos(x, y, z));
             }
+
+            public boolean ground(int x, int y, int z) {
+                return Path.ground(level, new BlockPos(x, y, z));
+            }
+        };
+        List<BlockPos> out = new ArrayList<>();
+        for (Pathfinder.Pos p : Pathfinder.find(blocks, pos(start), pos(goal), within)) {
+            out.add(new BlockPos(p.x(), p.y(), p.z()));
         }
-        return List.of();
+        return out;
     }
 
-    private static List<BlockPos> unwind(Node n) {
-        Deque<BlockPos> out = new ArrayDeque<>();
-        for (Node at = n; at != null; at = at.parent) {
-            out.addFirst(at.pos);
-        }
-        return new ArrayList<>(out);
+    private static Pathfinder.Pos pos(BlockPos p) {
+        return new Pathfinder.Pos(p.getX(), p.getY(), p.getZ());
     }
 }

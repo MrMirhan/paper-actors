@@ -5,3 +5,5 @@ pluginManagement {
     }
 }
 rootProject.name = 'paper-actors'
+// The Minestom side: a library a Minestom test server calls, with the same core and the same API as the Paper plugin.
+include 'minestom'
