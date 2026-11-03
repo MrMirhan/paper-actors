@@ -20,7 +20,10 @@ public final class Api implements AutoCloseable {
     private static final Gson GSON = new Gson();
 
     private final HttpServer http;
-    private final ExecutorService pool = Executors.newFixedThreadPool(2, r -> {
+    /** Calls answered at once: each waits for the server's next tick, so a crowd's commands need several in flight. */
+    public static final int THREADS = 16;
+
+    private final ExecutorService pool = Executors.newFixedThreadPool(THREADS, r -> {
         Thread t = new Thread(r, "paper-actors-api");
         t.setDaemon(true);
         return t;

@@ -76,10 +76,10 @@ public final class ActorSettings {
         return this;
     }
 
-    /** How many actors at once (1-1000), and how many of a crowd join each tick (1-20). */
+    /** How many actors at once (1-10000), and how many of a crowd join each tick (1-50). */
     public ActorSettings limits(int maxActors, int spawnsPerTick) {
         this.maxActors = Math.max(1, Math.min(MinestomActors.HARD_MAX, maxActors));
-        this.spawnsPerTick = Math.max(1, Math.min(20, spawnsPerTick));
+        this.spawnsPerTick = Math.max(1, Math.min(50, spawnsPerTick));
         return this;
     }
 
