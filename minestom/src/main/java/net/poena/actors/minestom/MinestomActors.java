@@ -70,14 +70,19 @@ import org.slf4j.LoggerFactory;
  * API call, runs at the start of a tick, before the instances tick.
  */
 public final class MinestomActors implements Control {
-    /** The most actors one server can be asked for; the settings' limit is the real one. */
-    public static final int HARD_MAX = 1000;
+    /**
+     * The most actors one server can be asked for; the settings' limit is the real one. Higher than Paper's 1000: a Minestom actor
+     * costs far less (README, "Load").
+     */
+    public static final int HARD_MAX = 10_000;
     private static final Logger LOG = LoggerFactory.getLogger(MinestomActors.class);
 
     private final ActorSettings cfg;
     private final String serverName;
     private final EventLog log = new EventLog(2000);
     private final TickStats ticks = new TickStats(System.currentTimeMillis());
+    /** The actors' own share of each tick: the API calls, the crowd joining, the scene and every actor's brain and walk. */
+    private final TickStats actorTicks = new TickStats(System.currentTimeMillis());
     private final Map<String, Actor> actors = new LinkedHashMap<>();
     private final Set<UUID> actorIds = ConcurrentHashMap.newKeySet();
     private final Set<String> actorNames = ConcurrentHashMap.newKeySet();
@@ -211,6 +216,15 @@ public final class MinestomActors implements Control {
     // ---- the tick: API calls, crowds joining, the scene, then each actor
 
     private void tick() {
+        long start = System.nanoTime();
+        try {
+            tickActors();
+        } finally {
+            actorTicks.record(System.nanoTime() - start, System.currentTimeMillis());
+        }
+    }
+
+    private void tickActors() {
         for (Runnable job; (job = jobs.poll()) != null; ) {
             job.run();
         }
@@ -392,6 +406,8 @@ public final class MinestomActors implements Control {
             JsonObject o = new JsonObject();
             o.add("tps", ticks.tps(now));
             o.add("mspt", ticks.mspt());
+            // Of each tick, what driving the actors took (the rest is the server's and the game's own work).
+            o.add("actorsMspt", actorTicks.mspt());
             int chunks = 0;
             int entities = 0;
             JsonArray worlds = new JsonArray();

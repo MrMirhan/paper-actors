@@ -341,13 +341,16 @@ final class Actor {
                 task = null;
             }
             case "watch" -> {
-                String target = str(req, "target");
-                find(target);
-                start(timed("watch", seconds(req, 1.5), () -> faceEntity(find(target))), true);
+                // The target once: a lookup by name goes through every online player on Minestom.
+                Player target = find(str(req, "target"));
+                start(timed("watch", seconds(req, 1.5), () -> {
+                    if (here(target)) {
+                        faceEntity(target);
+                    }
+                }), true);
             }
             case "stroll" -> start(new Stroll(num(req, "x"), num(req, "z"), bool(req, "sprint")), true);
-            case "fight" -> start(new Fight(find(str(req, "target")).getUsername(), "1.9".equals(opt(req, "style", "1.8")) ? "1.9" : "1.8",
-                    seconds(req, 8)), true);
+            case "fight" -> start(new Fight(find(str(req, "target")), "1.9".equals(opt(req, "style", "1.8")) ? "1.9" : "1.8", seconds(req, 8)), true);
             case "walk" -> {
                 float f = (float) clamp(opt(req, "forward", 1), -1, 1);
                 float s = (float) clamp(opt(req, "strafe", 0), -1, 1);
@@ -530,6 +533,11 @@ final class Actor {
         return pos.distance(t.getPosition());
     }
 
+    /** The player is still online and in the actor's world. */
+    private boolean here(Player p) {
+        return p.isOnline() && !p.isRemoved() && p.getInstance() == player.getInstance();
+    }
+
     private Player find(String targetName) {
         Player p = MinecraftServer.getConnectionManager().getOnlinePlayerByUsername(targetName);
         if (p == null || p.getInstance() != player.getInstance()) {
@@ -576,7 +584,7 @@ final class Actor {
     }
 
     private final class Fight implements Task {
-        private final String targetName;
+        private final Player target;
         private final String style;
         private final long end;
         private long nextSwing;
@@ -586,8 +594,8 @@ final class Actor {
         private long retreatUntil;
         private int sinceAim;
 
-        Fight(String targetName, String style, double seconds) {
-            this.targetName = targetName;
+        Fight(Player target, String style, double seconds) {
+            this.target = target;
             this.style = style;
             this.end = ticks + Math.round(seconds * 20);
             this.nextSwing = ticks;
@@ -598,8 +606,7 @@ final class Actor {
         }
 
         public boolean tick() {
-            Player target = MinecraftServer.getConnectionManager().getOnlinePlayerByUsername(targetName);
-            if (target == null || target.isDead() || target.getInstance() != player.getInstance() || ticks >= end) {
+            if (!here(target) || target.isDead() || ticks >= end) {
                 return true;
             }
             double dist = distance(target);

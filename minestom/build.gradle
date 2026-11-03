@@ -58,6 +58,8 @@ tasks.register('runTestServer', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'net.poena.actors.minestom.TestServer'
     standardInput = System.in
+    // For a load test: ACTORS_JVM_ARGS="-Xmx6g" ACTORS_MAX=5000 ACTORS_PER_TICK=20 ./gradlew :minestom:runTestServer
+    jvmArgs((System.getenv('ACTORS_JVM_ARGS') ?: '').tokenize())
 }
 
 jar {
