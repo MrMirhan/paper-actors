@@ -1,8 +1,10 @@
 name: Release
 
+# A push to main that changes the version in build.gradle publishes that version: the release creates its v<version> tag.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,19 +19,29 @@ jobs:
           distribution: temurin
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v4
-      - name: The tag matches the version in build.gradle
+      - name: The version in build.gradle, and whether it has a release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           version=$(sed -n "s/^version = '\(.*\)'/\1/p" build.gradle)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "tag $GITHUB_REF_NAME does not match version $version in build.gradle" >&2
-            exit 1
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" > /dev/null 2>&1; then
+            echo "v$version is already released; nothing to do"
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
           fi
-      - run: ./gradlew build
-      - uses: actions/setup-python@v5
+      - if: steps.version.outputs.new == 'true'
+        run: ./gradlew build
+      - if: steps.version.outputs.new == 'true'
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python3 -m unittest discover -s client
+      - if: steps.version.outputs.new == 'true'
+        run: python3 -m unittest discover -s client
       - name: Collect the release files
+        if: steps.version.outputs.new == 'true'
         run: |
           mkdir dist
           cp build/libs/paper-actors-*.jar dist/
@@ -38,6 +50,8 @@ jobs:
           (cd dist && sha256sum * > SHA256SUMS.txt)
           cat dist/SHA256SUMS.txt
       - name: Publish the release
+        if: steps.version.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "$TAG" --generate-notes
