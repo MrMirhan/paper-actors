@@ -20,6 +20,11 @@ Use it on a **test or filming server only**. The plugin switches itself off on a
 - Paper 26.2 (the plugin uses server internals; other versions are not tested)
 - Java 25
 
+## Download
+
+Get `paper-actors-<version>.jar` and `actors_client.py` from the
+[releases](https://github.com/MrMirhan/paper-actors/releases). `SHA256SUMS.txt` has the checksums.
+
 ## Build
 
 ```bash
@@ -120,3 +125,7 @@ python3 -m unittest discover -s client
 ## Credits
 
 Some ideas come from [CraftWire](https://github.com/UXPLIMA/craftwire) (MIT).
+
+## License
+
+[MIT](LICENSE)
